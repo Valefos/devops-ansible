@@ -1,0 +1,46 @@
+---
+- name: Завантажити та виконати скрипт для створення користувача
+  hosts: '{{ HOSTS }}'
+  become: yes
+
+  vars:
+    username: testuser  # ← заміни на потрібного користувача
+    script_path: /tmp/add_user.sh
+
+  tasks:
+    - name: Копіювати скрипт на сервер
+      copy:
+        content: |
+          #!/bin/bash
+          if id "{{ username }}" &>/dev/null; then
+              echo "Користувач '{{ username }}' вже існує"
+              exit 0
+          else
+              useradd "{{ username }}"
+              echo "Користувача '{{ username }}' створено"
+          fi
+        dest: "{{ script_path }}"
+        mode: '0755'
+
+    - name: Запустити скрипт
+      shell: "{{ script_path }}"
+      register: result
+
+    - name: Вивести результат виконання скрипта
+      debug:
+        msg: "{{ result.stdout_lines }}"
+
+    - name: Показати інформацію про користувача
+      shell: id {{ username }}
+      register: user_info
+      changed_when: false
+
+    - name: Вивід user id
+      debug:
+        msg: "{{ user_info.stdout_lines }}"
+
+    - name: Видалити скрипт
+      file:
+        path: "{{ script_path }}"
+        state: absent
+

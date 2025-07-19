@@ -1,0 +1,42 @@
+---
+- hosts: '{{ HOSTS }}'
+  become: yes
+
+  tasks:
+    - name: Install apps Debian family
+      apt:
+        name: ['vim', 'zip']
+        state: present
+        update_cache: true
+      when: ansible_os_family == 'Debian'
+
+    - name: Install nginx
+      apt:
+        name: nginx
+        state: latest
+        update_cache: yes
+
+    - name: Ensure nginx is running
+      systemd:
+        name: nginx
+        state: started
+        enabled: yes
+
+    - name: change index.html
+      copy:
+        content: |
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <meta charset="UTF-8">
+              <title>Мой сайт</title>
+          </head>
+          <body>
+              <h1>Мій сайт</h1>
+          </body>
+          </html>
+        dest: /var/www/html/index.html
+        owner: www-data
+        group: www-data
+        mode: '0644'
+
