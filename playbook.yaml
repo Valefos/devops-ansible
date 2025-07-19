@@ -1,9 +1,0 @@
----
-
-  - hosts: '{{ HOST }}'
-    become: yes
-    tasks:
-      - name: get server hostname
-        command: hostname
-        register: command_output
-      - debug: msg="{{command_output.stdout}}"
