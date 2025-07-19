@@ -1,0 +1,86 @@
+---
+- name: Установка Docker и запуск Nagios
+  hosts: '{{ HOSTS }}'
+  become: yes
+
+  vars:
+    nagios_container_name: nagios
+    nagios_host_name: "{{ inventory_hostname }}"
+    nagios_config_dir: /opt/nagios/etc/servers
+    nagios_port: 8080
+
+  tasks:
+
+    - name: Установить необходимые пакеты
+      apt:
+        name: ['apt-transport-https', 'ca-certificates', 'curl', 'gnupg-agent', 'software-properties-common']
+        state: present
+        update_cache: yes
+
+    - name: Добавить GPG ключ Docker
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Добавить репозиторий Docker
+      apt_repository:
+        repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable
+        state: present
+        filename: docker
+
+    - name: Установить Docker и Docker Compose
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose
+        state: present
+        update_cache: yes
+
+    - name: Запустить и включить Docker
+      systemd:
+        name: docker
+        enabled: yes
+        state: started
+
+    - name: Создать директорию для конфигурации Nagios
+      file:
+        path: "{{ nagios_config_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Создать конфигурацию хоста для Nagios
+      copy:
+        dest: "{{ nagios_config_dir }}/{{ nagios_host_name }}.cfg"
+        content: |
+          define host {
+              use                             linux-server
+              host_name                       {{ nagios_host_name }}
+              alias                           My Ansible Host
+              address                         {{ ansible_host }}
+              max_check_attempts              5
+              check_period                    24x7
+              notification_interval           30
+              notification_period             24x7
+          }
+
+          define service {
+              use                             generic-service
+              host_name                       {{ nagios_host_name }}
+              service_description             PING
+              check_command                   check_ping!100.0,20%!500.0,60%
+          }
+        mode: '0644'
+
+    - name: Запустить контейнер с Nagios
+      docker_container:
+        name: "{{ nagios_container_name }}"
+        image: jasonrivers/nagios:latest
+        ports:
+          - "{{ nagios_port }}:80"
+        volumes:
+          - "{{ nagios_config_dir }}:/opt/nagios/etc/servers"
+        restart_policy: always
+        state: started
+
